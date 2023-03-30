@@ -1,6 +1,7 @@
 package fr.xephi.authme.process.login;
 
 import com.google.common.annotations.VisibleForTesting;
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.data.TempbanManager;
 import fr.xephi.authme.data.auth.PlayerAuth;
@@ -34,6 +35,8 @@ import fr.xephi.authme.settings.properties.RestrictionSettings;
 import fr.xephi.authme.util.InternetProtocolUtils;
 import fr.xephi.authme.util.PlayerUtils;
 import fr.xephi.authme.util.Utils;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
@@ -48,6 +51,12 @@ import java.util.Locale;
 public class AsynchronousLogin implements AsynchronousProcess {
     
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(AsynchronousLogin.class);
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
 
     @Inject
     private DataSource dataSource;
@@ -188,8 +197,7 @@ public class AsynchronousLogin implements AsynchronousProcess {
             return null;
         }
 
-        boolean isAsync = service.getProperty(PluginSettings.USE_ASYNC_TASKS);
-        AuthMeAsyncPreLoginEvent event = new AuthMeAsyncPreLoginEvent(player, isAsync);
+        AuthMeAsyncPreLoginEvent event = new AuthMeAsyncPreLoginEvent(player);
         bukkitService.callEvent(event);
         if (!event.canLogin()) {
             return null;
@@ -239,12 +247,11 @@ public class AsynchronousLogin implements AsynchronousProcess {
     private void handleWrongPassword(Player player, PlayerAuth auth, String ip) {
         logger.fine(player.getName() + " used the wrong password");
 
-        bukkitService.createAndCallEvent(isAsync -> new FailedLoginEvent(player, isAsync));
+        bukkitService.createAndCallEvent(new FailedLoginEvent(player));
         if (tempbanManager.shouldTempban(ip)) {
             tempbanManager.tempbanPlayer(player);
         } else if (service.getProperty(RestrictionSettings.KICK_ON_WRONG_PASSWORD)) {
-            bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(
-                () -> player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.WRONG_PASSWORD)));
+            player.getScheduler().run(authMe, st -> player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.WRONG_PASSWORD)), null);
         } else {
             service.send(player, MessageKey.WRONG_PASSWORD);
 
@@ -305,8 +312,8 @@ public class AsynchronousLogin implements AsynchronousProcess {
             if (bungeeSender.isEnabled()) {
                 // As described at https://www.spigotmc.org/wiki/bukkit-bungee-plugin-messaging-channel/
                 // "Keep in mind that you can't send plugin messages directly after a player joins."
-                bukkitService.scheduleSyncDelayedTask(() ->
-                    bungeeSender.sendAuthMeBungeecordMessage(player, MessageType.LOGIN), 5L);
+                player.getScheduler().runDelayed(authMe, st ->
+                    bungeeSender.sendAuthMeBungeecordMessage(player, MessageType.LOGIN), null, 5L);
             }
 
             // As the scheduling executes the Task most likely after the current

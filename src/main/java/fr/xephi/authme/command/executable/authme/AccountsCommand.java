@@ -1,11 +1,13 @@
 package fr.xephi.authme.command.executable.authme;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.command.ExecutableCommand;
 import fr.xephi.authme.data.auth.PlayerAuth;
 import fr.xephi.authme.datasource.DataSource;
 import fr.xephi.authme.message.MessageKey;
 import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.service.CommonService;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import org.bukkit.command.CommandSender;
 
 import javax.inject.Inject;
@@ -18,10 +20,11 @@ import java.util.Locale;
 public class AccountsCommand implements ExecutableCommand {
 
     @Inject
-    private DataSource dataSource;
-
+    private AuthMe authMe;
     @Inject
-    private BukkitService bukkitService;
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private DataSource dataSource;
 
     @Inject
     private CommonService commonService;
@@ -33,7 +36,7 @@ public class AccountsCommand implements ExecutableCommand {
 
         // Assumption: a player name cannot contain '.'
         if (playerName.contains(".")) {
-            bukkitService.runTaskAsynchronously(() -> {
+            asyncScheduler.runNow(authMe, st -> {
                 List<String> accountList = dataSource.getAllAuthsByIp(playerName);
                 if (accountList.isEmpty()) {
                     sender.sendMessage("[AuthMe] This IP does not exist in the database.");
@@ -44,7 +47,7 @@ public class AccountsCommand implements ExecutableCommand {
                 }
             });
         } else {
-            bukkitService.runTaskAsynchronously(() -> {
+            asyncScheduler.runNow(authMe, st -> {
                 PlayerAuth auth = dataSource.getAuth(playerName.toLowerCase(Locale.ROOT));
                 if (auth == null) {
                     commonService.send(sender, MessageKey.UNKNOWN_USER);

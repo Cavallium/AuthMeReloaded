@@ -1,5 +1,6 @@
 package fr.xephi.authme.data.limbo;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.data.auth.PlayerCache;
 import fr.xephi.authme.data.captcha.RegistrationCaptchaManager;
 import fr.xephi.authme.message.MessageKey;
@@ -10,8 +11,11 @@ import fr.xephi.authme.settings.properties.RegistrationSettings;
 import fr.xephi.authme.settings.properties.RestrictionSettings;
 import fr.xephi.authme.task.MessageTask;
 import fr.xephi.authme.task.TimeoutTask;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
+import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Inject;
 
@@ -23,13 +27,16 @@ import static fr.xephi.authme.service.BukkitService.TICKS_PER_SECOND;
 class LimboPlayerTaskManager {
 
     @Inject
+    private AuthMe authMe;
+
+    @Inject
     private Messages messages;
 
     @Inject
     private Settings settings;
 
     @Inject
-    private BukkitService bukkitService;
+    private GlobalRegionScheduler globalRegionScheduler;
 
     @Inject
     private PlayerCache playerCache;
@@ -53,8 +60,8 @@ class LimboPlayerTaskManager {
         if (interval > 0) {
             String[] joinMessage = messages.retrieveSingle(player, result.messageKey, result.args).split("\n");
             MessageTask messageTask = new MessageTask(player, joinMessage);
-            bukkitService.runTaskTimer(messageTask, 2 * TICKS_PER_SECOND, interval * TICKS_PER_SECOND);
-            limbo.setMessageTask(messageTask);
+            @NotNull ScheduledTask scheduledTask = globalRegionScheduler.runAtFixedRate(authMe, st -> messageTask.run(), 2 * TICKS_PER_SECOND, (long) interval * TICKS_PER_SECOND);
+            limbo.setMessageTask(messageTask, scheduledTask);
         }
     }
 
@@ -68,7 +75,7 @@ class LimboPlayerTaskManager {
         final int timeout = settings.getProperty(RestrictionSettings.TIMEOUT) * TICKS_PER_SECOND;
         if (timeout > 0) {
             String message = messages.retrieveSingle(player, MessageKey.LOGIN_TIMEOUT_ERROR);
-            BukkitTask task = bukkitService.runTaskLater(new TimeoutTask(player, message, playerCache), timeout);
+            @NotNull ScheduledTask task = globalRegionScheduler.runDelayed(authMe, st -> new TimeoutTask(player, message, playerCache), timeout);
             limbo.setTimeoutTask(task);
         }
     }

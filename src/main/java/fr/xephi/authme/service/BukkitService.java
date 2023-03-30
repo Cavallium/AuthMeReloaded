@@ -34,141 +34,11 @@ public class BukkitService implements SettingsDependent {
     public static final int TICKS_PER_MINUTE = 60 * TICKS_PER_SECOND;
 
     private final AuthMe authMe;
-    private boolean useAsyncTasks;
 
     @Inject
     BukkitService(AuthMe authMe, Settings settings) {
         this.authMe = authMe;
         reload(settings);
-    }
-
-    /**
-     * Schedules a once off task to occur as soon as possible.
-     * <p>
-     * This task will be executed by the main server thread.
-     *
-     * @param task Task to be executed
-     * @return Task id number (-1 if scheduling failed)
-     */
-    public int scheduleSyncDelayedTask(Runnable task) {
-        return Bukkit.getScheduler().scheduleSyncDelayedTask(authMe, task);
-    }
-
-    /**
-     * Schedules a once off task to occur after a delay.
-     * <p>
-     * This task will be executed by the main server thread.
-     *
-     * @param task Task to be executed
-     * @param delay Delay in server ticks before executing task
-     * @return Task id number (-1 if scheduling failed)
-     */
-    public int scheduleSyncDelayedTask(Runnable task, long delay) {
-        return Bukkit.getScheduler().scheduleSyncDelayedTask(authMe, task, delay);
-    }
-
-    /**
-     * Schedules a synchronous task if we are currently on a async thread; if not, it runs the task immediately.
-     * Use this when {@link #runTaskOptionallyAsync(Runnable) optionally asynchronous tasks} have to
-     * run something synchronously.
-     *
-     * @param task the task to be run
-     */
-    public void scheduleSyncTaskFromOptionallyAsyncTask(Runnable task) {
-        if (Bukkit.isPrimaryThread()) {
-            task.run();
-        } else {
-            scheduleSyncDelayedTask(task);
-        }
-    }
-
-    /**
-     * Returns a task that will run on the next server tick.
-     *
-     * @param task the task to be run
-     * @return a BukkitTask that contains the id number
-     * @throws IllegalArgumentException if plugin is null
-     * @throws IllegalArgumentException if task is null
-     */
-    public BukkitTask runTask(Runnable task) {
-        return Bukkit.getScheduler().runTask(authMe, task);
-    }
-
-    /**
-     * Returns a task that will run after the specified number of server
-     * ticks.
-     *
-     * @param task the task to be run
-     * @param delay the ticks to wait before running the task
-     * @return a BukkitTask that contains the id number
-     * @throws IllegalArgumentException if plugin is null
-     * @throws IllegalArgumentException if task is null
-     */
-    public BukkitTask runTaskLater(Runnable task, long delay) {
-        return Bukkit.getScheduler().runTaskLater(authMe, task, delay);
-    }
-
-    /**
-     * Schedules this task to run asynchronously or immediately executes it based on
-     * AuthMe's configuration.
-     *
-     * @param task the task to run
-     */
-    public void runTaskOptionallyAsync(Runnable task) {
-        if (useAsyncTasks) {
-            runTaskAsynchronously(task);
-        } else {
-            task.run();
-        }
-    }
-
-    /**
-     * <b>Asynchronous tasks should never access any API in Bukkit. Great care
-     * should be taken to assure the thread-safety of asynchronous tasks.</b>
-     * <p>
-     * Returns a task that will run asynchronously.
-     *
-     * @param task the task to be run
-     * @return a BukkitTask that contains the id number
-     * @throws IllegalArgumentException if plugin is null
-     * @throws IllegalArgumentException if task is null
-     */
-    public BukkitTask runTaskAsynchronously(Runnable task) {
-        return Bukkit.getScheduler().runTaskAsynchronously(authMe, task);
-    }
-
-    /**
-     * <b>Asynchronous tasks should never access any API in Bukkit. Great care
-     * should be taken to assure the thread-safety of asynchronous tasks.</b>
-     * <p>
-     * Returns a task that will repeatedly run asynchronously until cancelled,
-     * starting after the specified number of server ticks.
-     *
-     * @param task the task to be run
-     * @param delay the ticks to wait before running the task for the first
-     *     time
-     * @param period the ticks to wait between runs
-     * @return a BukkitTask that contains the id number
-     * @throws IllegalArgumentException if task is null
-     * @throws IllegalStateException if this was already scheduled
-     */
-    public BukkitTask runTaskTimerAsynchronously(BukkitRunnable task, long delay, long period) {
-        return task.runTaskTimerAsynchronously(authMe, delay, period);
-    }
-
-    /**
-     * Schedules the given task to repeatedly run until cancelled, starting after the
-     * specified number of server ticks.
-     *
-     * @param task the task to schedule
-     * @param delay the ticks to wait before running the task
-     * @param period the ticks to wait between runs
-     * @return a BukkitTask that contains the id number
-     * @throws IllegalArgumentException if plugin is null
-     * @throws IllegalStateException if this was already scheduled
-     */
-    public BukkitTask runTaskTimer(BukkitRunnable task, long delay, long period) {
-        return task.runTaskTimer(authMe, delay, period);
     }
 
     /**
@@ -250,13 +120,11 @@ public class BukkitService implements SettingsDependent {
     /**
      * Creates an event with the provided function and emits it.
      *
-     * @param eventSupplier the event supplier: function taking a boolean specifying whether AuthMe is configured
-     *                      in async mode or not
+     * @param event the event
      * @param <E> the event type
      * @return the event that was created and emitted
      */
-    public <E extends Event> E createAndCallEvent(Function<Boolean, E> eventSupplier) {
-        E event = eventSupplier.apply(useAsyncTasks);
+    public <E extends Event> E createAndCallEvent(E event) {
         callEvent(event);
         return event;
     }
@@ -294,7 +162,6 @@ public class BukkitService implements SettingsDependent {
 
     @Override
     public void reload(Settings settings) {
-        useAsyncTasks = settings.getProperty(PluginSettings.USE_ASYNC_TASKS);
     }
 
     /**

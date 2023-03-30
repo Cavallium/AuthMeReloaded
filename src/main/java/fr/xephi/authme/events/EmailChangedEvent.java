@@ -22,10 +22,9 @@ public class EmailChangedEvent extends CustomEvent implements Cancellable {
      * @param oldEmail Old email player had on file. Can be null when user adds an email
      * @param newEmail New email that player tries to set. In case of adding email, this will contain
      *                the email is trying to set.
-     * @param isAsync should this event be called asynchronously?
      */
-    public EmailChangedEvent(Player player, String oldEmail, String newEmail, boolean isAsync) {
-        super(isAsync);
+    public EmailChangedEvent(Player player, String oldEmail, String newEmail) {
+        super(true);
         this.player = player;
         this.oldEmail = oldEmail;
         this.newEmail = newEmail;

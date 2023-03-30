@@ -1,5 +1,6 @@
 package fr.xephi.authme.process.register.executors;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.data.auth.PlayerAuth;
 import fr.xephi.authme.process.SyncProcessManager;
 import fr.xephi.authme.process.login.AsynchronousLogin;
@@ -29,6 +30,9 @@ abstract class AbstractPasswordRegisterExecutor<P extends AbstractPasswordRegist
      * and the login process thinks the user is not registered.
      */
     private static final int SYNC_LOGIN_DELAY = 5;
+
+    @Inject
+    private AuthMe authMe;
 
     @Inject
     private ValidationService validationService;
@@ -88,11 +92,7 @@ abstract class AbstractPasswordRegisterExecutor<P extends AbstractPasswordRegist
     public void executePostPersistAction(P params) {
         final Player player = params.getPlayer();
         if (performLoginAfterRegister(params)) {
-            if (commonService.getProperty(PluginSettings.USE_ASYNC_TASKS)) {
-                bukkitService.runTaskAsynchronously(() -> asynchronousLogin.forceLogin(player));
-            } else {
-                bukkitService.scheduleSyncDelayedTask(() -> asynchronousLogin.forceLogin(player), SYNC_LOGIN_DELAY);
-            }
+            player.getScheduler().run(authMe, st -> asynchronousLogin.forceLogin(player), null);
         }
         syncProcessManager.processSyncPasswordRegister(player);
     }

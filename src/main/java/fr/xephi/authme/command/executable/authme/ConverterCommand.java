@@ -3,6 +3,7 @@ package fr.xephi.authme.command.executable.authme;
 import ch.jalu.injector.factory.Factory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSortedMap;
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.command.ExecutableCommand;
 import fr.xephi.authme.datasource.converter.Converter;
@@ -18,6 +19,8 @@ import fr.xephi.authme.output.ConsoleLoggerFactory;
 import fr.xephi.authme.message.MessageKey;
 import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.service.CommonService;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.command.CommandSender;
 
 import javax.inject.Inject;
@@ -35,6 +38,13 @@ public class ConverterCommand implements ExecutableCommand {
 
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(ConverterCommand.class);
 
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private CommonService commonService;
 
@@ -56,7 +66,7 @@ public class ConverterCommand implements ExecutableCommand {
         final Converter converter = converterFactory.newInstance(converterClass);
 
         // Run the convert job
-        bukkitService.runTaskAsynchronously(() -> {
+        asyncScheduler.runNow(authMe, st -> {
             try {
                 converter.execute(sender);
             } catch (Exception e) {

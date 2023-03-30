@@ -5,6 +5,8 @@ description: ${project.description}
 main: ${pluginDescription.main}
 version: ${pluginDescription.version}
 api-version: 1.13
+folia-supported: true
+loader: fr.xephi.authme.AuthmePluginLoader
 softdepend:
     - Vault
     - LuckPerms

@@ -6,12 +6,14 @@ import com.google.common.annotations.VisibleForTesting;
 import fr.xephi.authme.api.v3.AuthMeApi;
 import fr.xephi.authme.command.CommandHandler;
 import fr.xephi.authme.datasource.DataSource;
+import fr.xephi.authme.initialization.DataAsyncScheduler;
 import fr.xephi.authme.initialization.DataFolder;
+import fr.xephi.authme.initialization.DataGlobalRegionScheduler;
+import fr.xephi.authme.initialization.DataRegionScheduler;
 import fr.xephi.authme.initialization.DataSourceProvider;
 import fr.xephi.authme.initialization.OnShutdownPlayerSaver;
 import fr.xephi.authme.initialization.OnStartupTasks;
 import fr.xephi.authme.initialization.SettingsProvider;
-import fr.xephi.authme.initialization.TaskCloser;
 import fr.xephi.authme.listener.BlockListener;
 import fr.xephi.authme.listener.EntityListener;
 import fr.xephi.authme.listener.PlayerListener;
@@ -32,16 +34,18 @@ import fr.xephi.authme.settings.properties.SecuritySettings;
 import fr.xephi.authme.task.CleanupTask;
 import fr.xephi.authme.task.purge.PurgeService;
 import fr.xephi.authme.util.ExceptionUtils;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
 import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.java.JavaPluginLoader;
-import org.bukkit.scheduler.BukkitScheduler;
 
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static fr.xephi.authme.service.BukkitService.TICKS_PER_MINUTE;
@@ -55,7 +59,7 @@ public class AuthMe extends JavaPlugin {
     // Constants
     private static final String PLUGIN_NAME = "AuthMeReloaded";
     private static final String LOG_FILENAME = "authme.log";
-    private static final int CLEANUP_INTERVAL = 5 * TICKS_PER_MINUTE;
+    private static final int CLEANUP_INTERVAL_MINUTES = 5;
 
     // Version and build number values
     private static String pluginVersion = "N/D";
@@ -65,6 +69,7 @@ public class AuthMe extends JavaPlugin {
     private CommandHandler commandHandler;
     private Settings settings;
     private DataSource database;
+    private AsyncScheduler scheduler;
     private BukkitService bukkitService;
     private Injector injector;
     private BackupService backupService;
@@ -79,8 +84,9 @@ public class AuthMe extends JavaPlugin {
     /*
      * Constructor for unit testing.
      */
+    @SuppressWarnings("removal")
     @VisibleForTesting
-    AuthMe(JavaPluginLoader loader, PluginDescriptionFile description, File dataFolder, File file) {
+    AuthMe(org.bukkit.plugin.java.JavaPluginLoader loader, PluginDescriptionFile description, File dataFolder, File file) {
         super(loader, description, dataFolder, file);
     }
 
@@ -161,7 +167,7 @@ public class AuthMe extends JavaPlugin {
 
         // Schedule clean up task
         CleanupTask cleanupTask = injector.getSingleton(CleanupTask.class);
-        cleanupTask.runTaskTimerAsynchronously(this, CLEANUP_INTERVAL, CLEANUP_INTERVAL);
+        scheduler.runAtFixedRate(this, st -> cleanupTask.run(), CLEANUP_INTERVAL_MINUTES, CLEANUP_INTERVAL_MINUTES, TimeUnit.MINUTES);
 
         // Do a backup on start
         backupService.doBackup(BackupService.BackupCause.START);
@@ -207,7 +213,9 @@ public class AuthMe extends JavaPlugin {
         injector.register(AuthMe.class, this);
         injector.register(Server.class, getServer());
         injector.register(PluginManager.class, getServer().getPluginManager());
-        injector.register(BukkitScheduler.class, getServer().getScheduler());
+        injector.register(AsyncScheduler.class, new DataAsyncScheduler(getServer().getAsyncScheduler()));
+        injector.register(RegionScheduler.class, new DataRegionScheduler(getServer().getRegionScheduler()));
+        injector.register(GlobalRegionScheduler.class, new DataGlobalRegionScheduler(getServer().getGlobalRegionScheduler()));
         injector.provide(DataFolder.class, getDataFolder());
         injector.registerProvider(Settings.class, SettingsProvider.class);
         injector.registerProvider(DataSource.class, DataSourceProvider.class);
@@ -242,6 +250,7 @@ public class AuthMe extends JavaPlugin {
      * @param injector the injector
      */
     void instantiateServices(Injector injector) {
+        scheduler = injector.getSingleton(AsyncScheduler.class);
         database = injector.getSingleton(DataSource.class);
         bukkitService = injector.getSingleton(BukkitService.class);
         commandHandler = injector.getSingleton(CommandHandler.class);
@@ -313,8 +322,15 @@ public class AuthMe extends JavaPlugin {
             backupService.doBackup(BackupService.BackupCause.STOP);
         }
 
-        // Wait for tasks and close data source
-        new TaskCloser(this, database).run();
+        // Wait for tasks
+        if (scheduler instanceof DataAsyncScheduler) {
+            ((DataAsyncScheduler) scheduler).close();
+        }
+
+        // Close data source
+        if (database != null) {
+            database.closeConnection();
+        }
 
         // Disabled correctly
         Consumer<String> infoLogMethod = logger == null ? getLogger()::info : logger::info;

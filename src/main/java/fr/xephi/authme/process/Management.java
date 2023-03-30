@@ -1,5 +1,6 @@
 package fr.xephi.authme.process;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.process.changepassword.AsyncChangePassword;
 import fr.xephi.authme.process.email.AsyncAddEmail;
 import fr.xephi.authme.process.email.AsyncChangeEmail;
@@ -12,6 +13,8 @@ import fr.xephi.authme.process.register.executors.RegistrationMethod;
 import fr.xephi.authme.process.register.executors.RegistrationParameters;
 import fr.xephi.authme.process.unregister.AsynchronousUnregister;
 import fr.xephi.authme.service.BukkitService;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -22,6 +25,14 @@ import javax.inject.Inject;
  */
 public class Management {
 
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private BukkitService bukkitService;
 
@@ -102,6 +113,6 @@ public class Management {
     }
 
     private void runTask(Runnable runnable) {
-        bukkitService.runTaskOptionallyAsync(runnable);
+        asyncScheduler.runNow(authMe, st -> runnable.run());
     }
 }

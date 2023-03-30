@@ -1,5 +1,6 @@
 package fr.xephi.authme.service;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.initialization.SettingsDependent;
 import fr.xephi.authme.message.MessageKey;
 import fr.xephi.authme.message.Messages;
@@ -8,6 +9,8 @@ import fr.xephi.authme.permission.PermissionsManager;
 import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.ProtectionSettings;
 import fr.xephi.authme.util.AtomicIntervalCounter;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.scheduler.BukkitTask;
 
 import javax.inject.Inject;
@@ -26,22 +29,26 @@ public class AntiBotService implements SettingsDependent {
     private final Messages messages;
     private final PermissionsManager permissionsManager;
     private final BukkitService bukkitService;
+    private final GlobalRegionScheduler globalRegionScheduler;
+    private final AuthMe authMe;
     private final CopyOnWriteArrayList<String> antibotKicked = new CopyOnWriteArrayList<>();
     // Settings
     private int duration;
     // Service status
-    private AntiBotStatus antiBotStatus;
+    private volatile AntiBotStatus antiBotStatus;
     private boolean startup;
-    private BukkitTask disableTask;
+    private ScheduledTask disableTask;
     private AtomicIntervalCounter flaggedCounter;
 
     @Inject
     AntiBotService(Settings settings, Messages messages, PermissionsManager permissionsManager,
-                   BukkitService bukkitService) {
+                   BukkitService bukkitService, AuthMe authMe, GlobalRegionScheduler globalRegionScheduler) {
         // Instances
         this.messages = messages;
         this.permissionsManager = permissionsManager;
         this.bukkitService = bukkitService;
+        this.authMe = authMe;
+        this.globalRegionScheduler = globalRegionScheduler;
         // Initial status
         disableTask = null;
         antiBotStatus = AntiBotStatus.DISABLED;
@@ -73,7 +80,7 @@ public class AntiBotService implements SettingsDependent {
         // Delay the schedule on first start
         if (startup) {
             int delay = settings.getProperty(ProtectionSettings.ANTIBOT_DELAY);
-            bukkitService.scheduleSyncDelayedTask(enableTask, delay * TICKS_PER_SECOND);
+            globalRegionScheduler.runDelayed(authMe, st -> enableTask.run(), delay * TICKS_PER_SECOND);
             startup = false;
         } else {
             enableTask.run();
@@ -91,9 +98,9 @@ public class AntiBotService implements SettingsDependent {
             disableTask.cancel();
         }
         // Schedule auto-disable
-        disableTask = bukkitService.runTaskLater(this::stopProtection, duration * TICKS_PER_MINUTE);
+        disableTask = globalRegionScheduler.runDelayed(authMe, st -> this.stopProtection(), duration * TICKS_PER_MINUTE);
         antiBotStatus = AntiBotStatus.ACTIVE;
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
+        globalRegionScheduler.run(authMe, st -> {
             // Inform admins
             bukkitService.getOnlinePlayers().stream()
                 .filter(player -> permissionsManager.hasPermission(player, AdminPermission.ANTIBOT_MESSAGES))

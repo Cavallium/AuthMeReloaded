@@ -1,6 +1,7 @@
 package fr.xephi.authme.data.limbo;
 
 import fr.xephi.authme.task.MessageTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Location;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -22,7 +23,8 @@ public class LimboPlayer {
     private final Location loc;
     private final float walkSpeed;
     private final float flySpeed;
-    private BukkitTask timeoutTask = null;
+    private ScheduledTask timeoutTask = null;
+    private ScheduledTask scheduledMessageTask = null;
     private MessageTask messageTask = null;
     private LimboPlayerState state = LimboPlayerState.PASSWORD_REQUIRED;
 
@@ -81,7 +83,7 @@ public class LimboPlayer {
      *
      * @return The timeout task associated to the player
      */
-    public BukkitTask getTimeoutTask() {
+    public ScheduledTask getTimeoutTask() {
         return timeoutTask;
     }
 
@@ -91,7 +93,7 @@ public class LimboPlayer {
      *
      * @param timeoutTask The task to set
      */
-    public void setTimeoutTask(BukkitTask timeoutTask) {
+    public void setTimeoutTask(ScheduledTask timeoutTask) {
         if (this.timeoutTask != null) {
             this.timeoutTask.cancel();
         }
@@ -107,23 +109,28 @@ public class LimboPlayer {
         return messageTask;
     }
 
+    public ScheduledTask getScheduledMessageTask() {
+        return scheduledMessageTask;
+    }
+
     /**
      * Set the messages task responsible for telling the player to log in or register.
      *
      * @param messageTask The message task to set
      */
-    public void setMessageTask(MessageTask messageTask) {
-        if (this.messageTask != null) {
-            this.messageTask.cancel();
+    public void setMessageTask(MessageTask messageTask, ScheduledTask scheduledMessageTask) {
+        if (this.scheduledMessageTask != null) {
+            this.scheduledMessageTask.cancel();
         }
         this.messageTask = messageTask;
+        this.scheduledMessageTask = scheduledMessageTask;
     }
 
     /**
      * Clears all tasks associated to the player.
      */
     public void clearTasks() {
-        setMessageTask(null);
+        setMessageTask(null, null);
         setTimeoutTask(null);
     }
 

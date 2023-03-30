@@ -1,9 +1,12 @@
 package fr.xephi.authme.command.executable.authme;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.command.ExecutableCommand;
 import fr.xephi.authme.datasource.DataSource;
 import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.task.purge.PurgeExecutor;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 
@@ -21,6 +24,14 @@ public class PurgePlayerCommand implements ExecutableCommand {
     @Inject
     private PurgeExecutor purgeExecutor;
 
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private BukkitService bukkitService;
 
@@ -30,8 +41,7 @@ public class PurgePlayerCommand implements ExecutableCommand {
     @Override
     public void executeCommand(CommandSender sender, List<String> arguments) {
         String option = arguments.size() > 1 ? arguments.get(1) : null;
-        bukkitService.runTaskAsynchronously(
-            () -> executeCommand(sender, arguments.get(0), option));
+        globalRegionScheduler.run(authMe, st -> executeCommand(sender, arguments.get(0), option));
     }
 
     private void executeCommand(CommandSender sender, String name, String option) {

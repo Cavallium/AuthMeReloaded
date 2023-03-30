@@ -14,10 +14,9 @@ public class UnregisterByPlayerEvent extends AbstractUnregisterEvent {
      * Constructor.
      *
      * @param player the player (never null)
-     * @param isAsync if the event is called asynchronously
      */
-    public UnregisterByPlayerEvent(Player player, boolean isAsync) {
-        super(player, isAsync);
+    public UnregisterByPlayerEvent(Player player) {
+        super(player);
     }
 
     /**

@@ -62,8 +62,7 @@ public class AsyncAddEmail implements AsynchronousProcess {
             } else if (!validationService.isEmailFreeForRegistration(email, player)) {
                 service.send(player, MessageKey.EMAIL_ALREADY_USED_ERROR);
             } else {
-                EmailChangedEvent event = bukkitService.createAndCallEvent(isAsync
-                    -> new EmailChangedEvent(player, null, email, isAsync));
+                EmailChangedEvent event = bukkitService.createAndCallEvent(new EmailChangedEvent(player, null, email));
                 if (event.isCancelled()) {
                     logger.info("Could not add email to player '" + player + "' – event was cancelled");
                     service.send(player, MessageKey.EMAIL_ADD_NOT_ALLOWED);

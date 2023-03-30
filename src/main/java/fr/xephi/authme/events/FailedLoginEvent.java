@@ -16,10 +16,9 @@ public class FailedLoginEvent extends CustomEvent {
      * Constructor.
      *
      * @param player The player
-     * @param isAsync if the event is called asynchronously
      */
-    public FailedLoginEvent(Player player, boolean isAsync) {
-        super(isAsync);
+    public FailedLoginEvent(Player player) {
+        super(true);
         this.player = player;
     }
 

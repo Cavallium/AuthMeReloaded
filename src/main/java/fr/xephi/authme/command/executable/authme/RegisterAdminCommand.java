@@ -1,5 +1,6 @@
 package fr.xephi.authme.command.executable.authme;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.command.ExecutableCommand;
 import fr.xephi.authme.data.auth.PlayerAuth;
@@ -12,6 +13,8 @@ import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.service.CommonService;
 import fr.xephi.authme.service.ValidationService;
 import fr.xephi.authme.service.ValidationService.ValidationResult;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -26,6 +29,13 @@ public class RegisterAdminCommand implements ExecutableCommand {
 
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(RegisterAdminCommand.class);
 
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private PasswordSecurity passwordSecurity;
 
@@ -55,7 +65,7 @@ public class RegisterAdminCommand implements ExecutableCommand {
             return;
         }
 
-        bukkitService.runTaskOptionallyAsync(() -> {
+        asyncScheduler.runNow(authMe, st -> {
             if (dataSource.isAuthAvailable(playerNameLowerCase)) {
                 commonService.send(sender, MessageKey.NAME_ALREADY_REGISTERED);
                 return;
@@ -77,8 +87,8 @@ public class RegisterAdminCommand implements ExecutableCommand {
             logger.info(sender.getName() + " registered " + playerName);
             final Player player = bukkitService.getPlayerExact(playerName);
             if (player != null) {
-                bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() ->
-                    player.kickPlayer(commonService.retrieveSingleMessage(player, MessageKey.KICK_FOR_ADMIN_REGISTER)));
+                player.getScheduler().run(authMe, st2 ->
+                    player.kickPlayer(commonService.retrieveSingleMessage(player, MessageKey.KICK_FOR_ADMIN_REGISTER)), null);
             }
         });
     }

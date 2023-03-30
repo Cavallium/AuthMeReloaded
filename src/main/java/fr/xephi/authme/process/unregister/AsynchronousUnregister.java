@@ -1,5 +1,6 @@
 package fr.xephi.authme.process.unregister;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.data.auth.PlayerAuth;
 import fr.xephi.authme.data.auth.PlayerCache;
@@ -19,6 +20,8 @@ import fr.xephi.authme.settings.commandconfig.CommandManager;
 import fr.xephi.authme.settings.properties.RegistrationSettings;
 import fr.xephi.authme.settings.properties.RestrictionSettings;
 import fr.xephi.authme.service.bungeecord.BungeeSender;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -31,6 +34,14 @@ import static fr.xephi.authme.service.BukkitService.TICKS_PER_SECOND;
 public class AsynchronousUnregister implements AsynchronousProcess {
     
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(AsynchronousUnregister.class);
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
 
     @Inject
     private DataSource dataSource;
@@ -76,7 +87,7 @@ public class AsynchronousUnregister implements AsynchronousProcess {
             if (dataSource.removeAuth(name)) {
                 performPostUnregisterActions(name, player);
                 logger.info(name + " unregistered himself");
-                bukkitService.createAndCallEvent(isAsync -> new UnregisterByPlayerEvent(player, isAsync));
+                bukkitService.createAndCallEvent(new UnregisterByPlayerEvent(player));
             } else {
                 service.send(player, MessageKey.ERROR);
             }
@@ -97,7 +108,7 @@ public class AsynchronousUnregister implements AsynchronousProcess {
     public void adminUnregister(CommandSender initiator, String name, Player player) {
         if (dataSource.removeAuth(name)) {
             performPostUnregisterActions(name, player);
-            bukkitService.createAndCallEvent(isAsync -> new UnregisterByAdminEvent(player, name, isAsync, initiator));
+            bukkitService.createAndCallEvent(new UnregisterByAdminEvent(player, name, initiator));
 
             if (initiator == null) {
                 logger.info(name + " was unregistered");
@@ -127,13 +138,13 @@ public class AsynchronousUnregister implements AsynchronousProcess {
         if (player == null || !player.isOnline()) {
             return;
         }
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() ->
+        globalRegionScheduler.run(authMe, st ->
             commandManager.runCommandsOnUnregister(player));
 
         if (service.getProperty(RegistrationSettings.FORCE)) {
             teleportationService.teleportOnJoin(player);
 
-            bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
+            globalRegionScheduler.run(authMe, st -> {
                 limboService.createLimboPlayer(player, false);
                 applyBlindEffect(player);
             });

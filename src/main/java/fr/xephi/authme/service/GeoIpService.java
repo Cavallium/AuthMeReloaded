@@ -10,6 +10,7 @@ import com.maxmind.db.Reader.FileMode;
 import com.maxmind.db.cache.CHMCache;
 import com.maxmind.db.model.Country;
 import com.maxmind.db.model.CountryResponse;
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.initialization.DataFolder;
 import fr.xephi.authme.output.ConsoleLoggerFactory;
@@ -17,6 +18,8 @@ import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.ProtectionSettings;
 import fr.xephi.authme.util.FileUtils;
 import fr.xephi.authme.util.InternetProtocolUtils;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 
 import javax.inject.Inject;
 import java.io.BufferedInputStream;
@@ -61,14 +64,22 @@ public class GeoIpService {
     private final BukkitService bukkitService;
     private final Settings settings;
 
+    private AuthMe authMe;
+
+    private AsyncScheduler asyncScheduler;
+    private GlobalRegionScheduler globalRegionScheduler;
+
     private GeoIp2Provider databaseReader;
     private volatile boolean downloading;
 
     @Inject
-    GeoIpService(@DataFolder File dataFolder, BukkitService bukkitService, Settings settings) {
+    GeoIpService(@DataFolder File dataFolder, BukkitService bukkitService, Settings settings, AuthMe authMe, AsyncScheduler asyncScheduler, GlobalRegionScheduler globalRegionScheduler) {
         this.bukkitService = bukkitService;
         this.dataFile = dataFolder.toPath().resolve(DATABASE_FILE);
         this.settings = settings;
+        this.authMe = authMe;
+        this.asyncScheduler = asyncScheduler;
+        this.globalRegionScheduler = globalRegionScheduler;
 
         // Fires download of recent data or the initialization of the look up service
         isDataAvailable();
@@ -121,7 +132,7 @@ public class GeoIpService {
 
         // File is outdated or doesn't exist - let's try to download the data file!
         // use bukkit's cached threads
-        bukkitService.runTaskAsynchronously(this::updateDatabase);
+        asyncScheduler.runNow(authMe, st -> this.updateDatabase());
         return false;
     }
 

@@ -1,5 +1,6 @@
 package fr.xephi.authme.data;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.initialization.HasCleanup;
 import fr.xephi.authme.initialization.SettingsDependent;
 import fr.xephi.authme.message.MessageKey;
@@ -9,6 +10,7 @@ import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.SecuritySettings;
 import fr.xephi.authme.util.PlayerUtils;
 import fr.xephi.authme.util.expiring.TimedCounter;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.entity.Player;
 
 import javax.inject.Inject;
@@ -25,7 +27,9 @@ import static fr.xephi.authme.util.Utils.MILLIS_PER_MINUTE;
 public class TempbanManager implements SettingsDependent, HasCleanup {
 
     private final Map<String, TimedCounter<String>> ipLoginFailureCounts;
+    private final AuthMe authMe;
     private final BukkitService bukkitService;
+    private final GlobalRegionScheduler globalRegionScheduler;
     private final Messages messages;
 
     private boolean isEnabled;
@@ -35,9 +39,11 @@ public class TempbanManager implements SettingsDependent, HasCleanup {
     private String customCommand;
 
     @Inject
-    TempbanManager(BukkitService bukkitService, Messages messages, Settings settings) {
+    TempbanManager(AuthMe authMe, BukkitService bukkitService, GlobalRegionScheduler globalRegionScheduler, Messages messages, Settings settings) {
+        this.authMe = authMe;
         this.ipLoginFailureCounts = new ConcurrentHashMap<>();
         this.bukkitService = bukkitService;
+        this.globalRegionScheduler = globalRegionScheduler;
         this.messages = messages;
         reload(settings);
     }
@@ -103,10 +109,15 @@ public class TempbanManager implements SettingsDependent, HasCleanup {
             long newTime = expires.getTime() + (length * MILLIS_PER_MINUTE);
             expires.setTime(newTime);
 
-            bukkitService.scheduleSyncDelayedTask(() -> {
+            player.getScheduler().run(authMe, st -> {
+                if (customCommand.isEmpty()) {
+                    player.kickPlayer(reason);
+                }
+            }, null);
+            
+            globalRegionScheduler.run(authMe, st -> {
                 if (customCommand.isEmpty()) {
                     bukkitService.banIp(ip, reason, expires, "AuthMe");
-                    player.kickPlayer(reason);
                 } else {
                     String command = customCommand
                         .replace("%player%", name)

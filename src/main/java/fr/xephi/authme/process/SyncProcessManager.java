@@ -1,5 +1,6 @@
 package fr.xephi.authme.process;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.process.login.ProcessSyncPlayerLogin;
 import fr.xephi.authme.process.logout.ProcessSyncPlayerLogout;
 import fr.xephi.authme.process.quit.ProcessSyncPlayerQuit;
@@ -22,7 +23,7 @@ import java.util.List;
 public class SyncProcessManager {
 
     @Inject
-    private BukkitService bukkitService;
+    private AuthMe authMe;
 
     @Inject
     private ProcessSyncEmailRegister processSyncEmailRegister;
@@ -34,29 +35,32 @@ public class SyncProcessManager {
     private ProcessSyncPlayerLogout processSyncPlayerLogout;
     @Inject
     private ProcessSyncPlayerQuit processSyncPlayerQuit;
+    // todo: remove after debugging
+    private final Runnable retiredError = new Runnable() {
+        @Override
+        public void run() {
+            authMe.getLogger().info("Player has retired");
+        }
+    };
 
 
     public void processSyncEmailRegister(Player player) {
-        runTask(() -> processSyncEmailRegister.processEmailRegister(player));
+        player.getScheduler().run(authMe, st -> processSyncEmailRegister.processEmailRegister(player), retiredError);
     }
 
     public void processSyncPasswordRegister(Player player) {
-        runTask(() -> processSyncPasswordRegister.processPasswordRegister(player));
+        player.getScheduler().run(authMe, st -> processSyncPasswordRegister.processPasswordRegister(player), retiredError);
     }
 
     public void processSyncPlayerLogout(Player player) {
-        runTask(() -> processSyncPlayerLogout.processSyncLogout(player));
+        player.getScheduler().run(authMe, st -> processSyncPlayerLogout.processSyncLogout(player), retiredError);
     }
 
     public void processSyncPlayerLogin(Player player, boolean isFirstLogin, List<String> authsWithSameIp) {
-        runTask(() -> processSyncPlayerLogin.processPlayerLogin(player, isFirstLogin, authsWithSameIp));
+        player.getScheduler().run(authMe, st -> processSyncPlayerLogin.processPlayerLogin(player, isFirstLogin, authsWithSameIp), retiredError);
     }
 
     public void processSyncPlayerQuit(Player player, boolean wasLoggedIn) {
-        runTask(() -> processSyncPlayerQuit.processSyncQuit(player, wasLoggedIn));
-    }
-
-    private void runTask(Runnable runnable) {
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(runnable);
+        player.getScheduler().run(authMe, st -> processSyncPlayerQuit.processSyncQuit(player, wasLoggedIn), retiredError);
     }
 }

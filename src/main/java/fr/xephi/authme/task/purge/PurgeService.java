@@ -1,5 +1,6 @@
 package fr.xephi.authme.task.purge;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.datasource.DataSource;
 import fr.xephi.authme.output.ConsoleLoggerFactory;
@@ -8,6 +9,7 @@ import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.PurgeSettings;
 import fr.xephi.authme.util.Utils;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 
@@ -27,6 +29,11 @@ public class PurgeService {
 
     @Inject
     private BukkitService bukkitService;
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
 
     @Inject
     private DataSource dataSource;
@@ -99,7 +106,7 @@ public class PurgeService {
 
         isPurging = true;
         PurgeTask purgeTask = new PurgeTask(this, permissionsManager, sender, names, players);
-        bukkitService.runTaskTimerAsynchronously(purgeTask, 0, 1);
+        globalRegionScheduler.runAtFixedRate(authMe, purgeTask, 0, 1);
     }
 
     /**

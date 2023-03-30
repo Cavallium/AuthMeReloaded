@@ -1,5 +1,6 @@
 package fr.xephi.authme.initialization;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.data.auth.PlayerCache;
 import fr.xephi.authme.datasource.CacheDataSource;
@@ -14,6 +15,8 @@ import fr.xephi.authme.output.ConsoleLoggerFactory;
 import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.DatabaseSettings;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -29,6 +32,14 @@ public class DataSourceProvider implements Provider<DataSource> {
 
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(DataSourceProvider.class);
 
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     @DataFolder
     private File dataFolder;
@@ -90,7 +101,7 @@ public class DataSourceProvider implements Provider<DataSource> {
     }
 
     private void checkDataSourceSize(DataSource dataSource) {
-        bukkitService.runTaskAsynchronously(() -> {
+        asyncScheduler.runNow(authMe, st -> {
             int accounts = dataSource.getAccountsRegistered();
             if (accounts >= SQLITE_MAX_SIZE) {
                 logger.warning("YOU'RE USING THE SQLITE DATABASE WITH "

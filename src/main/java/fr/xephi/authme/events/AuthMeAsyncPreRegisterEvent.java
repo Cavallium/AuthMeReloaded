@@ -19,10 +19,9 @@ public class AuthMeAsyncPreRegisterEvent extends CustomEvent {
      * Constructor.
      *
      * @param player The player
-     * @param isAsync True if the event is async, false otherwise
      */
-    public AuthMeAsyncPreRegisterEvent(Player player, boolean isAsync) {
-        super(isAsync);
+    public AuthMeAsyncPreRegisterEvent(Player player) {
+        super(true);
         this.player = player;
     }
 

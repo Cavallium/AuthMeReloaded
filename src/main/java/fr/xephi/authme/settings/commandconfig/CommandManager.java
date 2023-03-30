@@ -2,6 +2,7 @@ package fr.xephi.authme.settings.commandconfig;
 
 import ch.jalu.configme.SettingsManager;
 import ch.jalu.configme.SettingsManagerBuilder;
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.initialization.DataFolder;
 import fr.xephi.authme.initialization.Reloadable;
 import fr.xephi.authme.service.BukkitService;
@@ -11,6 +12,8 @@ import fr.xephi.authme.util.FileUtils;
 import fr.xephi.authme.util.PlayerUtils;
 import fr.xephi.authme.util.lazytags.Tag;
 import fr.xephi.authme.util.lazytags.WrappedTagReplacer;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.entity.Player;
 
 import javax.inject.Inject;
@@ -29,6 +32,9 @@ public class CommandManager implements Reloadable {
 
     private final File dataFolder;
     private final BukkitService bukkitService;
+    private AuthMe authMe;
+    private AsyncScheduler asyncScheduler;
+    private GlobalRegionScheduler globalRegionScheduler;
     private final GeoIpService geoIpService;
     private final CommandMigrationService commandMigrationService;
     private final List<Tag<Player>> availableTags = buildAvailableTags();
@@ -43,11 +49,14 @@ public class CommandManager implements Reloadable {
 
     @Inject
     CommandManager(@DataFolder File dataFolder, BukkitService bukkitService, GeoIpService geoIpService,
-                   CommandMigrationService commandMigrationService) {
+                   CommandMigrationService commandMigrationService, AuthMe authMe, GlobalRegionScheduler globalRegionScheduler, AsyncScheduler asyncScheduler) {
         this.dataFolder = dataFolder;
         this.bukkitService = bukkitService;
         this.geoIpService = geoIpService;
         this.commandMigrationService = commandMigrationService;
+        this.authMe = authMe;
+        this.globalRegionScheduler = globalRegionScheduler;
+        this.asyncScheduler = asyncScheduler;
         reload();
     }
 
@@ -129,7 +138,7 @@ public class CommandManager implements Reloadable {
             if (predicate.test(cmd)) {
                 long delay = cmd.getDelay();
                 if (delay > 0) {
-                    bukkitService.scheduleSyncDelayedTask(() -> dispatchCommand(player, cmd), delay);
+                    globalRegionScheduler.runDelayed(authMe, st -> dispatchCommand(player, cmd), delay);
                 } else {
                     dispatchCommand(player, cmd);
                 }

@@ -1,5 +1,6 @@
 package fr.xephi.authme.service;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.data.auth.PlayerAuth;
 import fr.xephi.authme.data.auth.PlayerCache;
@@ -14,6 +15,10 @@ import fr.xephi.authme.output.ConsoleLoggerFactory;
 import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.SpawnLoader;
 import fr.xephi.authme.settings.properties.RestrictionSettings;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -32,6 +37,15 @@ public class TeleportationService implements Reloadable {
     
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(TeleportationService.class);
 
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
+    @Inject
+    private RegionScheduler regionScheduler;
     @Inject
     private Settings settings;
 
@@ -182,10 +196,10 @@ public class TeleportationService implements Reloadable {
      * @param event  the event to emit and according to which to teleport
      */
     private void performTeleportation(final Player player, final AbstractTeleportEvent event) {
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
+        regionScheduler.run(authMe, event.getFrom(), st -> {
             bukkitService.callEvent(event);
             if (player.isOnline() && isEventValid(event)) {
-                player.teleport(event.getTo());
+                player.teleportAsync(event.getTo());
             }
         });
     }

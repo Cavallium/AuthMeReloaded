@@ -13,8 +13,8 @@ public class RestoreSessionEvent extends CustomEvent implements Cancellable {
     private final Player player;
     private boolean isCancelled;
 
-    public RestoreSessionEvent(Player player, boolean isAsync) {
-        super(isAsync);
+    public RestoreSessionEvent(Player player) {
+        super(true);
         this.player = player;
     }
 

@@ -17,7 +17,6 @@ public abstract class AbstractTeleportEvent extends CustomEvent implements Cance
     /**
      * Constructor.
      *
-     * @param isAsync Whether to fire the event asynchronously or not
      * @param player The player
      * @param to The teleport destination
      */

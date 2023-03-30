@@ -80,8 +80,7 @@ public class AsyncRegister implements AsynchronousProcess {
             return false;
         }
 
-        AuthMeAsyncPreRegisterEvent event = bukkitService.createAndCallEvent(
-            isAsync -> new AuthMeAsyncPreRegisterEvent(player, isAsync));
+        AuthMeAsyncPreRegisterEvent event = bukkitService.createAndCallEvent(new AuthMeAsyncPreRegisterEvent(player));
         if (!event.canRegister()) {
             return false;
         }

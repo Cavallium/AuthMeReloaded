@@ -9,6 +9,8 @@ import fr.xephi.authme.output.ConsoleLoggerFactory;
 import fr.xephi.authme.service.BukkitService;
 import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.HooksSettings;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.messaging.Messenger;
 
@@ -19,6 +21,8 @@ public class BungeeSender implements SettingsDependent {
 
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(BungeeSender.class);
     private final AuthMe plugin;
+    private AsyncScheduler asyncScheduler;
+    private GlobalRegionScheduler globalRegionScheduler;
     private final BukkitService bukkitService;
 
     private boolean isEnabled;
@@ -28,9 +32,11 @@ public class BungeeSender implements SettingsDependent {
      * Constructor.
      */
     @Inject
-    BungeeSender(AuthMe plugin, BukkitService bukkitService, Settings settings) {
+    BungeeSender(AuthMe plugin, BukkitService bukkitService, Settings settings, AsyncScheduler asyncScheduler, GlobalRegionScheduler globalRegionScheduler) {
         this.plugin = plugin;
         this.bukkitService = bukkitService;
+        this.asyncScheduler = asyncScheduler;
+        this.globalRegionScheduler = globalRegionScheduler;
         reload(settings);
     }
 
@@ -85,7 +91,7 @@ public class BungeeSender implements SettingsDependent {
             return;
         }
         // Add a small delay, just in case...
-        bukkitService.scheduleSyncDelayedTask(() ->
+        globalRegionScheduler.runDelayed(plugin, st ->
             sendBungeecordMessage(player, "Connect", destinationServerOnLogin), 10L);
     }
 

@@ -1,6 +1,7 @@
 package fr.xephi.authme.command.executable.email;
 
 import ch.jalu.datasourcecolumns.data.DataSourceValue;
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.command.PlayerCommand;
 import fr.xephi.authme.data.auth.PlayerCache;
@@ -13,6 +14,8 @@ import fr.xephi.authme.service.CommonService;
 import fr.xephi.authme.service.PasswordRecoveryService;
 import fr.xephi.authme.service.RecoveryCodeService;
 import fr.xephi.authme.util.Utils;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.entity.Player;
 
 import javax.inject.Inject;
@@ -25,6 +28,14 @@ public class RecoverEmailCommand extends PlayerCommand {
 
     private final ConsoleLogger logger = ConsoleLoggerFactory.get(RecoverEmailCommand.class);
 
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private CommonService commonService;
 
@@ -73,7 +84,7 @@ public class RecoverEmailCommand extends PlayerCommand {
             return;
         }
 
-        bukkitService.runTaskAsynchronously(() -> {
+        asyncScheduler.runNow(authMe, st -> {
             if (recoveryCodeService.isRecoveryCodeNeeded()) {
                 // Recovery code is needed; generate and send one
                 recoveryService.createAndSendRecoveryCode(player, email);

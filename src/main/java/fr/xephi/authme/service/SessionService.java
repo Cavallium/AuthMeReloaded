@@ -50,8 +50,7 @@ public class SessionService implements Reloadable {
 
             SessionState state = fetchSessionStatus(auth, player);
             if (state.equals(SessionState.VALID)) {
-                RestoreSessionEvent event = bukkitService.createAndCallEvent(
-                    isAsync -> new RestoreSessionEvent(player, isAsync));
+                RestoreSessionEvent event = bukkitService.createAndCallEvent(new RestoreSessionEvent(player));
                 return !event.isCancelled();
             } else if (state.equals(SessionState.IP_CHANGED)) {
                 service.send(player, MessageKey.SESSION_EXPIRED);

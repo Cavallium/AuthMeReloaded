@@ -13,6 +13,8 @@ import fr.xephi.authme.settings.Settings;
 import fr.xephi.authme.settings.properties.DatabaseSettings;
 import fr.xephi.authme.settings.properties.EmailSettings;
 import fr.xephi.authme.settings.properties.PluginSettings;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.apache.logging.log4j.LogManager;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
@@ -22,6 +24,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import javax.inject.Inject;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import static fr.xephi.authme.service.BukkitService.TICKS_PER_MINUTE;
@@ -40,6 +43,12 @@ public class OnStartupTasks {
     private Settings settings;
     @Inject
     private BukkitService bukkitService;
+    @Inject
+    private AuthMe authMe;
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
     @Inject
     private Messages messages;
 
@@ -96,19 +105,16 @@ public class OnStartupTasks {
         if (!settings.getProperty(RECALL_PLAYERS)) {
             return;
         }
-        bukkitService.runTaskTimerAsynchronously(new BukkitRunnable() {
-            @Override
-            public void run() {
-                List<String> loggedPlayersWithEmptyMail = dataSource.getLoggedPlayersWithEmptyMail();
-                bukkitService.runTask(() -> {
-                    for (String playerWithoutMail : loggedPlayersWithEmptyMail) {
-                        Player player = bukkitService.getPlayerExact(playerWithoutMail);
-                        if (player != null) {
-                            messages.send(player, MessageKey.ADD_EMAIL_MESSAGE);
-                        }
+        asyncScheduler.runAtFixedRate(authMe, task -> {
+            List<String> loggedPlayersWithEmptyMail = dataSource.getLoggedPlayersWithEmptyMail();
+            globalRegionScheduler.run(authMe, st -> {
+                for (String playerWithoutMail : loggedPlayersWithEmptyMail) {
+                    Player player = bukkitService.getPlayerExact(playerWithoutMail);
+                    if (player != null) {
+                        messages.send(player, MessageKey.ADD_EMAIL_MESSAGE);
                     }
-                });
-            }
-        }, 1, TICKS_PER_MINUTE * settings.getProperty(EmailSettings.DELAY_RECALL));
+                }
+            });
+        }, 50, 1000L * 60L * settings.getProperty(EmailSettings.DELAY_RECALL), TimeUnit.MILLISECONDS);
     }
 }

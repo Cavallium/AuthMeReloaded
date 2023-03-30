@@ -15,10 +15,7 @@ public abstract class CustomEvent extends Event {
     }
 
     /**
-     * Constructor, specifying whether the event is asynchronous or not.
-     *
-     * @param isAsync {@code true} to fire the event asynchronously, false otherwise
-     * @see Event#Event(boolean)
+     * Constructor.
      */
     public CustomEvent(boolean isAsync) {
         super(isAsync);

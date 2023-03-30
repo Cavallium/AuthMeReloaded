@@ -22,10 +22,9 @@ public class ProtectInventoryEvent extends CustomEvent implements Cancellable {
      * Constructor.
      *
      * @param player The player
-     * @param isAsync True if the event is async, false otherwise
      */
-    public ProtectInventoryEvent(Player player, boolean isAsync) {
-        super(isAsync);
+    public ProtectInventoryEvent(Player player) {
+        super(true);
         this.player = player;
         this.storedInventory = player.getInventory().getContents();
         this.storedArmor = player.getInventory().getArmorContents();

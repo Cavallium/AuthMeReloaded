@@ -1,5 +1,6 @@
 package fr.xephi.authme.process.join;
 
+import fr.xephi.authme.AuthMe;
 import fr.xephi.authme.ConsoleLogger;
 import fr.xephi.authme.data.ProxySessionManager;
 import fr.xephi.authme.data.limbo.LimboService;
@@ -24,6 +25,8 @@ import fr.xephi.authme.settings.properties.RegistrationSettings;
 import fr.xephi.authme.settings.properties.RestrictionSettings;
 import fr.xephi.authme.util.InternetProtocolUtils;
 import fr.xephi.authme.util.PlayerUtils;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.GameMode;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
@@ -46,6 +49,14 @@ public class AsynchronousJoin implements AsynchronousProcess {
 
     @Inject
     private Server server;
+
+    @Inject
+    private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
+    @Inject
+    private GlobalRegionScheduler globalRegionScheduler;
 
     @Inject
     private DataSource database;
@@ -107,7 +118,7 @@ public class AsynchronousJoin implements AsynchronousProcess {
         if (service.getProperty(RestrictionSettings.FORCE_SURVIVAL_MODE)
             && player.getGameMode() != GameMode.SURVIVAL
             && !service.hasPermission(player, PlayerStatePermission.BYPASS_FORCE_SURVIVAL)) {
-            bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> player.setGameMode(GameMode.SURVIVAL));
+            player.getScheduler().run(authMe, st -> player.setGameMode(GameMode.SURVIVAL), null);
         }
 
         if (service.getProperty(HooksSettings.DISABLE_SOCIAL_SPY)) {
@@ -123,8 +134,7 @@ public class AsynchronousJoin implements AsynchronousProcess {
         if (isAuthAvailable) {
             // Protect inventory
             if (service.getProperty(PROTECT_INVENTORY_BEFORE_LOGIN)) {
-                ProtectInventoryEvent ev = bukkitService.createAndCallEvent(
-                    isAsync -> new ProtectInventoryEvent(player, isAsync));
+                ProtectInventoryEvent ev = bukkitService.createAndCallEvent(new ProtectInventoryEvent(player));
                 if (ev.isCancelled()) {
                     player.updateInventory();
                     logger.fine("ProtectInventoryEvent has been cancelled for " + player.getName() + "...");
@@ -135,31 +145,27 @@ public class AsynchronousJoin implements AsynchronousProcess {
             if (sessionService.canResumeSession(player)) {
                 service.send(player, MessageKey.SESSION_RECONNECTION);
                 // Run commands
-                bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(
-                    () -> commandManager.runCommandsOnSessionLogin(player));
-                bukkitService.runTaskOptionallyAsync(() -> asynchronousLogin.forceLogin(player));
+                globalRegionScheduler.run(authMe, st -> commandManager.runCommandsOnSessionLogin(player));
+                asyncScheduler.runNow(authMe, st -> asynchronousLogin.forceLogin(player));
                 return;
             } else if (proxySessionManager.shouldResumeSession(name)) {
                 service.send(player, MessageKey.SESSION_RECONNECTION);
                 // Run commands
-                bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(
-                    () -> commandManager.runCommandsOnSessionLogin(player));
-                bukkitService.runTaskOptionallyAsync(() -> asynchronousLogin.forceLogin(player));
+                globalRegionScheduler.run(authMe, st -> commandManager.runCommandsOnSessionLogin(player));
+                asyncScheduler.runNow(authMe, st -> asynchronousLogin.forceLogin(player));
                 logger.info("The user " + player.getName() + " has been automatically logged in, "
                     + "as present in autologin queue.");
                 return;
             }
         } else if (!service.getProperty(RegistrationSettings.FORCE)) {
-            bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
-                welcomeMessageConfiguration.sendWelcomeMessage(player);
-            });
+            globalRegionScheduler.run(authMe, st -> welcomeMessageConfiguration.sendWelcomeMessage(player));
 
             // Skip if registration is optional
 
             if (bungeeSender.isEnabled()) {
                 // As described at https://www.spigotmc.org/wiki/bukkit-bungee-plugin-messaging-channel/
                 // "Keep in mind that you can't send plugin messages directly after a player joins."
-                bukkitService.scheduleSyncDelayedTask(() ->
+                globalRegionScheduler.runDelayed(authMe, st ->
                     bungeeSender.sendAuthMeBungeecordMessage(player, MessageType.LOGIN), 5L);
             }
             return;
@@ -169,12 +175,15 @@ public class AsynchronousJoin implements AsynchronousProcess {
     }
 
     private void handlePlayerWithUnmetNameRestriction(Player player, String ip) {
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
-            player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.NOT_OWNER_ERROR));
+        Runnable afterKick = () -> {
             if (service.getProperty(RestrictionSettings.BAN_UNKNOWN_IP)) {
                 server.banIP(ip);
             }
-        });
+        };
+        player.getScheduler().run(authMe, st -> {
+            player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.NOT_OWNER_ERROR));
+            afterKick.run();
+        }, afterKick);
     }
 
     /**
@@ -187,7 +196,7 @@ public class AsynchronousJoin implements AsynchronousProcess {
     private void processJoinSync(Player player, boolean isAuthAvailable) {
         int registrationTimeout = service.getProperty(RestrictionSettings.TIMEOUT) * TICKS_PER_SECOND;
 
-        bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(() -> {
+        globalRegionScheduler.run(authMe, st -> {
             limboService.createLimboPlayer(player, isAuthAvailable);
 
             player.setNoDamageTicks(registrationTimeout);
@@ -218,8 +227,7 @@ public class AsynchronousJoin implements AsynchronousProcess {
             && !InternetProtocolUtils.isLoopbackAddress(ip)
             && countOnlinePlayersByIp(ip) > service.getProperty(RestrictionSettings.MAX_JOIN_PER_IP)) {
 
-            bukkitService.scheduleSyncTaskFromOptionallyAsyncTask(
-                () -> player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.SAME_IP_ONLINE)));
+            globalRegionScheduler.run(authMe, st -> player.kickPlayer(service.retrieveSingleMessage(player, MessageKey.SAME_IP_ONLINE)));
             return false;
         }
         return true;
