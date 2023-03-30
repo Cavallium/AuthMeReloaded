@@ -11,6 +11,7 @@ import fr.xephi.authme.service.CommonService;
 import fr.xephi.authme.service.ValidationService;
 import fr.xephi.authme.settings.properties.PluginSettings;
 import fr.xephi.authme.settings.properties.RegistrationSettings;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import org.bukkit.entity.Player;
 
 import javax.inject.Inject;
@@ -33,6 +34,9 @@ abstract class AbstractPasswordRegisterExecutor<P extends AbstractPasswordRegist
 
     @Inject
     private AuthMe authMe;
+
+    @Inject
+    private AsyncScheduler asyncScheduler;
 
     @Inject
     private ValidationService validationService;
@@ -92,7 +96,7 @@ abstract class AbstractPasswordRegisterExecutor<P extends AbstractPasswordRegist
     public void executePostPersistAction(P params) {
         final Player player = params.getPlayer();
         if (performLoginAfterRegister(params)) {
-            player.getScheduler().run(authMe, st -> asynchronousLogin.forceLogin(player), null);
+            asyncScheduler.runNow(authMe, st -> asynchronousLogin.forceLogin(player));
         }
         syncProcessManager.processSyncPasswordRegister(player);
     }
